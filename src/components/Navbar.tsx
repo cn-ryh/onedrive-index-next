@@ -1,6 +1,6 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { IconName } from '@fortawesome/fontawesome-svg-core'
-import { Dialog, Transition } from '@headlessui/react'
+import { Dialog, DialogTitle, Transition, TransitionChild } from '@headlessui/react'
 import toast, { Toaster } from 'react-hot-toast'
 import { useHotkeys } from 'react-hotkeys-hook'
 
@@ -131,7 +131,7 @@ const Navbar = () => {
       <Transition appear show={isOpen} as={Fragment}>
         <Dialog as="div" className="fixed inset-0 z-10 overflow-y-auto" open={isOpen} onClose={() => setIsOpen(false)}>
           <div className="min-h-screen px-4 text-center">
-            <Transition.Child
+            <TransitionChild
               as={Fragment}
               enter="ease-out duration-100"
               enterFrom="opacity-0"
@@ -140,14 +140,14 @@ const Navbar = () => {
               leaveFrom="opacity-100"
               leaveTo="opacity-0"
             >
-              <Dialog.Overlay className="fixed inset-0 bg-gray-50 dark:bg-gray-800" />
-            </Transition.Child>
+              <div className="fixed inset-0 bg-gray-50 dark:bg-gray-800" />
+            </TransitionChild>
 
             {/* This element is to trick the browser into centering the modal contents. */}
             <span className="inline-block h-screen align-middle" aria-hidden="true">
               &#8203;
             </span>
-            <Transition.Child
+            <TransitionChild
               as={Fragment}
               enter="ease-out duration-100"
               enterFrom="opacity-0 scale-95"
@@ -157,9 +157,9 @@ const Navbar = () => {
               leaveTo="opacity-0 scale-95"
             >
               <div className="my-8 inline-block w-full max-w-md transform overflow-hidden rounded-lg bg-white p-6 text-left align-middle transition-all dark:bg-gray-900">
-                <Dialog.Title className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                <DialogTitle className="text-lg font-bold text-gray-900 dark:text-gray-100">
                   {t('Clear all tokens?')}
-                </Dialog.Title>
+                </DialogTitle>
                 <div className="mt-2">
                   <p className="text-sm text-gray-500">
                     {t('These tokens are used to authenticate yourself into password protected folders, ') +
@@ -192,7 +192,7 @@ const Navbar = () => {
                   </button>
                 </div>
               </div>
-            </Transition.Child>
+            </TransitionChild>
           </div>
         </Dialog>
       </Transition>

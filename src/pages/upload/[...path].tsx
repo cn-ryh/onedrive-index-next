@@ -60,7 +60,6 @@ export default function TUploadImageFlow() {
                                     "Content-Type": `text/plain`
                                 }
                             }).then((uploadRes) => {
-                                console.log(uploadRes);
                                 uploadFileResolve({
                                     name: file.name!,
                                     url: uploadRes.data["@microsoft.graph.downloadUrl"],
@@ -132,7 +131,6 @@ export default function TUploadImageFlow() {
         }
     };
     const { query } = useRouter()
-    console.log(query);
     return (
         <div>
             <Head>

@@ -60,7 +60,6 @@ export default function TUploadImageFlow() {
                                 "Content-Range": `bytes ${beginByte}-${endByte}/${fileSize}`
                             }
                         })
-                        console.log(`@${file.name}\n` + uploadLog.data);
                         // this block successly put, clear retryTime
                         retryTime = 0;
                         uploadRef.current?.uploadFilePercent({
@@ -113,7 +112,6 @@ export default function TUploadImageFlow() {
                 return;
             }
             const uploadPath = queryToPath(query);
-            console.log(`/api?path=${encodeURI(uploadPath)}`);
 
             axios.post(`/api/getAccessToken`, {
                 password: password

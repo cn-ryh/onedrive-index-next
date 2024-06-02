@@ -221,11 +221,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const requestPath = encodePath(cleanPath)
-    console.log(cleanPath);
-    console.log(requestPath);
     // Handle response from OneDrive API
     const requestUrl = `${apiConfig.driveApi}/root${requestPath}`
-    console.log(requestUrl);
     // Whether path is root, which requires some special treatment
     const isRoot = requestPath === ''
 

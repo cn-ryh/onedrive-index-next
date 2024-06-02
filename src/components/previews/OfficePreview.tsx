@@ -2,8 +2,6 @@ import type { OdFileObject } from '../../types'
 import { FC, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 
-import Preview from 'preview-office-docs'
-
 import DownloadButtonGroup from '../DownloadBtnGtoup'
 import { DownloadBtnContainer } from './Containers'
 import { getBaseUrl } from '../../utils/getBaseUrl'
@@ -26,8 +24,12 @@ const OfficePreview: FC<{ file: OdFileObject }> = ({ file }) => {
 
   return (
     <div>
+          
       <div className="overflow-scroll" ref={docContainer} style={{ maxHeight: '90vh' }}>
-        <Preview url={docUrl} width={docContainerWidth.toString()} height="600" />
+              <iframe src={`https://view.officeapps.live.com/op/view.aspx?src=${docUrl}`} style={{
+                  width: "100%",
+                  minHeight: "80vh"
+              }} ></iframe>
       </div>
       <DownloadBtnContainer>
         <DownloadButtonGroup />
