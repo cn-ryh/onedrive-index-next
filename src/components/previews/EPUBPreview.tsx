@@ -21,7 +21,7 @@ const EPUBPreview: FC<{ file: OdFileObject }> = ({ file }) => {
     setEpubContainerWidth(epubContainer.current ? epubContainer.current.offsetWidth : 400)
   }, [])
 
-  const [location, setLocation] = useState<string>()
+  const [location, setLocation] = useState<string>(``)
   const onLocationChange = (cfiStr: string) => setLocation(cfiStr)
 
   const { t } = useTranslation()
