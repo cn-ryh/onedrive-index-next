@@ -120,10 +120,6 @@ export default function TUploadImageFlow() {
                     const parentId = getParentRes.data.id;
                     const List: Promise<UploadFile>[] = [];
                     for (let file of fileList as UploadFile[]) {
-                        // const fileValue = file.raw!;
-                        // const fileBlob = new Blob([fileValue], { type: fileValue.type })
-                        // const baseName = fileValue.name!.substring(0, fileValue.name!.lastIndexOf("."));
-                        // const extName = fileValue.name!.substring(fileValue.name!.lastIndexOf("."));
                         List.push(new Promise<UploadFile>((uploadFileResolve) => {
                             uploadFileToCloud(file, token.data, parentId).then(()=>
                             {

@@ -15,15 +15,91 @@ import { queryToPath } from '../../components/FileListing'
 import { UploadOuterForwardRef } from 'tdesign-react/lib/upload/upload'
 import { UploadRef } from 'tdesign-react/lib/upload/interface'
 const ABRIDGE_NAME = [4, 6];
+function sleep(time: number) {
+    return new Promise<void>((resolve) => setTimeout(() => resolve(), time));
+}
 export default function TUploadImageFlow() {
     const [password, setPassword] = useState('');
     const [images, setImages]: [UploadFile[], React.Dispatch<React.SetStateAction<UploadFile[]>>] = useState([] as UploadFile[]);
     const [files, setFiles]: [UploadFile[], React.Dispatch<React.SetStateAction<UploadFile[]>>] = useState([] as UploadFile[]);
-    const myRef: React.ForwardedRef<UploadRef> = useRef(null)
+    const uploadRef: React.ForwardedRef<UploadRef> = useRef(null)
+    // every block 6Mib
+    const blockSize = 6553600;
+    /**
+     * 
+     * @param file 要上传的文件对象
+     * @param uploadRef 上传组件 Ref（用于更新上传进度）
+     * @param accessToken OneDrive token
+     * @param parentId 上传到的文件夹 id
+     */
+    const uploadFileToCloud = (file: UploadFile, accessToken: string, parentId: string) => {
 
+        const fileValue = file.raw!;
+        const uploadName = fileValue.name!.substring(0, fileValue.name!.lastIndexOf("."))
+            + `-` + (new Date().getTime()).toString()
+            + fileValue.name!.substring(fileValue.name!.lastIndexOf("."));
+        const fileSize = fileValue.size;
+        return new Promise<void>((resolve, reject) => {
+            axios.post(encodeURI(`${driveApi}/items/${parentId}:/${uploadName}:/createUploadSession`), {}, {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`
+                }
+            }).then(async (getPutPathRes) => {
+                const putPath: string = getPutPathRes.data.uploadUrl;
+
+                // the retry time of THIS BLOCK 
+                let retryTime = 0;
+                for (let beginByte = 0; beginByte < fileSize; beginByte += blockSize) {
+                    try {
+                        const endByte = Math.min(beginByte + blockSize - 1, fileSize - 1);
+                        const uploadLog = await axios.put(putPath, fileValue.slice(beginByte, endByte + 1), {
+                            headers:
+                            {
+                                Authorization: `Bearer ${accessToken}`,
+                                // NOT blockSize, the last block may smaller
+                                "Content-Range": `bytes ${beginByte}-${endByte}/${fileSize}`
+                            }
+                        })
+                        // this block successly put, clear retryTime
+                        retryTime = 0;
+                        uploadRef.current?.uploadFilePercent({
+                            file,
+                            percent: Math.floor(100 * endByte / fileSize)
+                        })
+                    }
+                    catch (err) {
+                        console.error(err);
+                        if (retryTime >= 5) {
+                            NotificationPlugin.error({
+                                title: `出现问题，请查看日志`,
+                                content: `达到最大重试次数`
+                            })
+                            await axios.delete(putPath, {
+                                headers: {
+                                    Authorization: `Bearer ${accessToken}`
+                                }
+                            });
+                            reject(`Max retry Time`);
+                            return;
+                        }
+                        else {
+                            // retry after 2s
+                            await sleep(2000);
+                            ++retryTime;
+                            beginByte -= blockSize;
+                        }
+                    }
+                }
+                resolve();
+            }).catch((err) => {
+                console.error(err);
+                reject(err);
+            })
+        })
+    }
     const filesRequestMethod = (fileList: UploadFile | UploadFile[]) => {
         return new Promise<RequestMethodResponse>((resolve) => {
-            if (password == ``) {
+            if (!password || password == ``) {
                 NotificationPlugin.error({
                     title: `请输入上传密码`
                 })
@@ -36,48 +112,54 @@ export default function TUploadImageFlow() {
                 return;
             }
             const uploadPath = queryToPath(query);
+
             axios.post(`/api/getAccessToken`, {
                 password: password
             }).then((token) => {
-                axios.post(`/api?path=${encodeURI(uploadPath)}`).then((getParentRes) => {
+                axios.get(`/api/?path=${encodeURI(uploadPath)}`).then((getParentRes) => {
                     const parentId = getParentRes.data.id;
                     const List: Promise<UploadFile>[] = [];
                     for (let file of fileList as UploadFile[]) {
-                        const fileValue = file.raw!;
-                        const fileBlob = new Blob([fileValue], { type: fileValue.type })
-                        const baseName = fileValue.name!.substring(0, fileValue.name!.lastIndexOf("."));
-                        const extName = fileValue.name!.substring(fileValue.name!.lastIndexOf("."));
                         List.push(new Promise<UploadFile>((uploadFileResolve) => {
-                            setTimeout(() => {
-                                myRef.current?.uploadFilePercent({
-                                    file: file,
-                                    percent: 50
-                                })
-                            }, 1000);
-                            axios.put(driveApi + `/root:${baseDirectory}/${baseName + `-` + (new Date().getTime()).toString() + extName}` + `:/content`, fileBlob, {
-                                headers: {
-                                    "Authorization": token.data,
-                                    "Content-Type": `text/plain`
-                                }
-                            }).then((uploadRes) => {
+                            uploadFileToCloud(file, token.data, parentId).then(() => {
                                 uploadFileResolve({
-                                    name: file.name!,
-                                    url: uploadRes.data["@microsoft.graph.downloadUrl"],
+                                    name: file.name,
                                     status: `success`
                                 })
                             }).catch((err) => {
-                                console.error(err);
                                 uploadFileResolve({
-                                    name: file.name!,
-                                    url: ``,
+                                    name: file.name,
                                     status: `fail`
                                 })
                             })
+                            // axios.put(driveApi + `/root:${baseDirectory}/${baseName + `-` + (new Date().getTime()).toString() + extName}` + `:/content`, fileValue, {
+                            //     headers: {
+                            //         "Authorization": token.data,
+                            //         "Content-Type": `text/plain`
+                            //     }
+                            // }).then((uploadRes) => {
+                            //     console.log(uploadRes);
+                            //     uploadFileResolve({
+                            //         name: file.name!,
+                            //         url: uploadRes.data["@microsoft.graph.downloadUrl"],
+                            //         status: `success`
+                            //     })
+                            // }).catch((err) => {
+                            //     console.error(err);
+                            //     uploadFileResolve({
+                            //         name: file.name!,
+                            //         url: ``,
+                            //         status: `fail`
+                            //     })
+                            // })
                         }))
                     }
                     Promise.all(List).then((data) => {
+
                         resolve({
-                            status: 'success',
+                            status: data.find((value) => {
+                                return value.status === `fail`
+                            }) ? 'fail' : `success`,
                             response: {
                                 files: data
                             }
@@ -91,18 +173,25 @@ export default function TUploadImageFlow() {
                         NotificationPlugin.error({
                             title: `要上传的路径不存在`
                         })
+                        resolve({
+                            status: 'fail',
+                            response: {
+                                error: `要上传的路径不存在`
+                            }
+                        })
                     }
                     else {
                         NotificationPlugin.error({
                             title: `获取文件夹id失败`
                         })
+                        resolve({
+                            status: 'fail',
+                            response: {
+                                error: err.message ?? `获取文件夹id失败`
+                            }
+                        })
                     }
-                    resolve({
-                        status: 'fail',
-                        response: {
-                            error: err
-                        }
-                    })
+
                 })
 
             }).catch((err) => {
@@ -120,7 +209,6 @@ export default function TUploadImageFlow() {
     // 有文件数量超出时会触发，文件大小超出限制、文件同名时会触发等场景。注意如果设置允许上传同名文件，则此事件不会触发
     const onValidate = (params) => {
         const { files, type } = params;
-        console.log('onValidate', params);
         if (type === 'FILE_OVER_SIZE_LIMIT') {
             files.map((t) => t.name).join('、');
             MessagePlugin.warning(`${files.map((t) => t.name).join('、')} 等文件大小超出限制，已自动过滤`, 5000);
@@ -155,37 +243,25 @@ export default function TUploadImageFlow() {
                                 />
                                 <br />
                                 <Upload
-                                    files={images}
-                                    onChange={setImages}
-                                    requestMethod={filesRequestMethod}
-                                    placeholder="图片上传"
-                                    theme="image-flow"
-                                    accept="image/*"
+                                    ref={uploadRef}
+                                    files={files}
+                                    onChange={setFiles}
+                                    placeholder="文件上传"
+                                    theme="file-flow"
                                     multiple
-                                    autoUpload={false}
                                     max={0}
-                                    abridgeName={ABRIDGE_NAME}
+                                    abridge-name={ABRIDGE_NAME}
+                                    requestMethod={filesRequestMethod}
+                                    autoUpload={false}
+                                    showThumbnail={true}
                                     uploadAllFilesInOneRequest={true}
+                                    isBatchUpload={false}
+                                    allowUploadDuplicateFile={false}
                                     onValidate={onValidate}
                                 />
                             </Space>
-                            <Upload
-                                ref={myRef}
-                                files={files}
-                                onChange={setFiles}
-                                placeholder="文件上传"
-                                theme="file-flow"
-                                multiple
-                                max={0}
-                                abridge-name={ABRIDGE_NAME}
-                                requestMethod={filesRequestMethod}
-                                autoUpload={false}
-                                showThumbnail={true}
-                                uploadAllFilesInOneRequest={true}
-                                isBatchUpload={false}
-                                allowUploadDuplicateFile={false}
-                                onValidate={onValidate}
-                            />                    </div>
+
+                        </div>
                     </main>
 
                     <Footer />
